@@ -6,13 +6,25 @@ osx_image: xcode10.1
 notifications:
   email: false
 
-os:
-  - osx
+matrix:
+  include:
+    - os: osx
+    - os: linux
+      dist: xenial
+      sudo: required
+      compiler: gcc
 
 before_install:
-  - brew update
-  - brew install qt5
-  - export QTDIR=/usr/local/opt/qt5
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then
+      brew update;
+      brew install qt5;
+      export QTDIR=/usr/local/opt/qt5;
+    fi
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then
+      sudo apt-get install -qq qt5-default qttools5-dev-tools libqt5serialport5 libqt5serialport5-dev libusb-dev libusb-1.0-0-dev fakeroot;
+      export QTDIR=/usr/lib/x86_64-linux-gnu/qt5;
+      export QT_SELECT=qt5;
+    fi
   - export PATH=$PATH:$QTDIR/bin
   - export VERSION=`cat Software/VERSION`
   - qmake -v
@@ -20,15 +32,30 @@ before_install:
 script:
   - cd Software
   - set -e
-  - ./update_locales.sh
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then
+      ./update_locales.sh;
+    fi
   - qmake -r
   - make
-  - macdeployqt bin/Prismatik.app -dmg
   - ls bin
-  - hdiutil attach bin/Prismatik.dmg
-  - ls /Volumes/bin:Prismatik/Prismatik.app
-  - otool -L /Volumes/bin:Prismatik/Prismatik.app/Contents/MacOS/Prismatik
-  - otool -L /Volumes/bin:Prismatik/Prismatik.app/Contents/Frameworks/QtWidgets.framework/Versions/5/QtWidgets
-  - hdiutil detach /dev/disk1s1
-  - 'if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then curl -T bin/Prismatik.dmg "https://psieg.de/lightpack/osx_builds/Prismatik_${VERSION}_${TRAVIS_BUILD_NUMBER}.dmg" -u "${PSIEG_UPLOAD_USER}:${PSIEG_UPLOAD_PASSWORD}"; fi'
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then
+      macdeployqt bin/Prismatik.app -dmg;
+      ls bin;
+      hdiutil attach bin/Prismatik.dmg;
+      ls /Volumes/bin:Prismatik/Prismatik.app;
+      otool -L /Volumes/bin:Prismatik/Prismatik.app/Contents/MacOS/Prismatik;
+      otool -L /Volumes/bin:Prismatik/Prismatik.app/Contents/Frameworks/QtWidgets.framework/Versions/5/QtWidgets;
+      hdiutil detach /dev/disk1s1;
+      if [ "$TRAVIS_PULL_REQUEST" = "false" ] && [ "$TRAVIS_BRANCH" = "master" ]; then curl -T bin/Prismatik.dmg "https://psieg.de/lightpack/osx_builds/Prismatik_${VERSION}_${TRAVIS_BUILD_NUMBER}.dmg" -u "${PSIEG_UPLOAD_USER}:${PSIEG_UPLOAD_PASSWORD}"; fi
+    fi
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then
+      scripts/linux/prepare_installer.sh;
+      cd dist_linux;
+      ./build-deb.sh amd64;
+      cd ../../Firmware;
+      if [ -x ./build_batch.sh ]; then
+        ./build_batch.sh;
+        ls hex;
+      fi
+    fi
   - set +e
