@@ -126,6 +126,7 @@ protected slots:
 
 protected:
 	const GrabbedScreen * screenOfRect(const QRect &rect) const;
+	static int GetTopBlackBorder(const unsigned char* data, int scrW, int scrH, int bytesPerPixel);
 
 signals:
 	void frameGrabAttempted(GrabResult grabResult);

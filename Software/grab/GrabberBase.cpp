@@ -28,6 +28,8 @@
 #include "GrabberBase.hpp"
 #include "src/debug.h"
 #include <cmath>
+#include <QElapsedTimer>
+#include <QFileInfo>
 
 namespace
 {
@@ -115,6 +117,65 @@ bool GrabberBase::isReallocationNeeded(const QList< ScreenInfo > &screensWithWid
 	return false;
 }
 
+
+inline int VRay(const unsigned char* data, int x, int scrW, int scrH, int bytesPerPixel, int bytesInRow, int limit)
+{
+	for (int y = 0; y < limit; y++)
+	{
+		const int offset = bytesInRow * y + x * bytesPerPixel;
+
+		const int r = data[offset + 2];
+		if (r > 0)
+		{
+			return y;
+		}
+
+		const int g = data[offset + 1];
+		if (g > 0)
+		{
+			return y;
+		}
+
+		const int b = data[offset + 0];
+		if (b > 0)
+		{
+			return y;
+		}
+	}
+
+	return 0;
+}
+
+int GrabberBase::GetTopBlackBorder(const unsigned char* data, int scrW, int scrH, int bytesPerPixel)
+{
+	// How many pixels will be scanned from the top
+	const int maxH = scrH / 4;
+
+	const int distanceBetweenRays = scrW / 128;
+
+	const int bytesInRow = scrW * bytesPerPixel;
+
+	int border = 0;
+
+	for (int p = 0; p < scrW; p += distanceBetweenRays)
+	{
+		const int r = VRay(data, p, scrW, scrH, bytesPerPixel, bytesInRow, maxH);
+		if (p == 0)
+		{
+			border = r;
+			continue;
+		}
+
+		if (border != r)
+		{
+			border = 0;
+			break;
+		}
+	}
+
+	return border;
+}
+
 void GrabberBase::grab()
 {
 	DEBUG_HIGH_LEVEL << Q_FUNC_INFO << this->metaObject()->className();
@@ -139,6 +200,9 @@ void GrabberBase::grab()
 	if (_lastGrabResult == GrabResultOk) {
 		++grabScreensCount;
 		_context->grabResult->clear();
+
+		int blackBorder = -1;
+		float scaleByBlackBorder = 1;
 
 		for (int i = 0; i < _context->grabWidgets->size(); ++i) {
 			if (!_context->grabWidgets->at(i)->isAreaEnabled()) {
@@ -215,14 +279,66 @@ void GrabberBase::grab()
 			}
 
 			const int bytesPerPixel = 4;
+
+			const int scrWidth = grabbedScreen->screenInfo.rect.width();
+			const int scrHeight = grabbedScreen->screenInfo.rect.height();
+			const auto data = grabbedScreen->imgData;
+
+			// Let's find a border height
+			if (blackBorder == -1)
+			{
+				blackBorder = GetTopBlackBorder(data, scrWidth, scrHeight, bytesPerPixel);
+				scaleByBlackBorder = (scrHeight - blackBorder) / static_cast<float>(scrHeight);
+			}
+
+			// If black border detected move and scale widgets
+			if (blackBorder > 0)
+			{
+				const int oldTop = preparedRect.top();
+				const int oldBottom = preparedRect.bottom();
+				const int oldH = oldBottom - oldTop;
+				const int newH = oldH * scaleByBlackBorder;
+				const int newBottom = oldBottom * scaleByBlackBorder + blackBorder;
+				const int newTop = newBottom - newH;
+
+				preparedRect.setCoords(
+					std::ceil(preparedRect.left()),
+					std::ceil(newTop),
+					std::floor(preparedRect.right()),
+					std::floor(newBottom)
+				);
+			}
+
 			Q_ASSERT(grabbedScreen->imgData);
 			QRgb avgColor = Grab::Calculations::calculateAvgColor(
-				grabbedScreen->imgData, grabbedScreen->imgFormat,
-				grabbedScreen->bytesPerRow > 0 ? grabbedScreen->bytesPerRow : grabbedScreen->screenInfo.rect.width() * bytesPerPixel,
+				data, grabbedScreen->imgFormat,
+				grabbedScreen->bytesPerRow > 0 ? grabbedScreen->bytesPerRow : scrWidth * bytesPerPixel,
 				preparedRect);
 			_context->grabResult->append(avgColor);
 		}
 
+		//QElapsedTimer timer;
+		//timer.start();
+
+		//float elapsed = timer.nsecsElapsed();
+
+		//std:std::string s;
+		//s.append(std::to_string(border));
+		//s.append(" in ");
+		//s.append(std::to_string(elapsed));
+		//s.append(" ms ");
+
+		//QString filename = "c:\\shot";
+		//QFile file(filename);
+		//if (file.open(QIODevice::ReadWrite)) {
+		//	QTextStream stream(&file);
+		//	stream << s.c_str() << endl;
+		//}
+		//file.close();
+
+		//auto elapsed = timer.elapsed();
+		//qDebug() << "The slow operation took" << elapsed << "milliseconds";
 	}
+
 	emit frameGrabAttempted(_lastGrabResult);
 }
