@@ -11,13 +11,13 @@ win32: {
 	# DEFINES += NO_OPENSSL
 
 	# optional: BASS library directory, for sound visualization (http://www.un4seen.com/)
-	DEFINES += BASS_SOUND_SUPPORT
-	BASS_DIR = "C:\\bass"
-	BASSWASAPI_DIR = "C:\\bass\\wasapi"
+	#DEFINES += BASS_SOUND_SUPPORT
+	#BASS_DIR = "C:\\bass"
+	#BASSWASAPI_DIR = "C:\\bass\\wasapi"
 
 	# optional: Night Light support, x86_64 only (https://github.com/zomfg/NightLightLibrary/releases)
 	DEFINES += NIGHTLIGHT_SUPPORT
-	NIGHTLIGHT_DIR = C:\\NightLightLibrary
+	NIGHTLIGHT_DIR = C:\\Projects\\LightpackFork\\NightLightLibrary\\
 
 	# Set this to x86 to compile 32-bit
 	TARGET_ARCH = x86_64
