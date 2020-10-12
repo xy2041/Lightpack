@@ -151,7 +151,7 @@ int GrabberBase::GetTopBlackBorder(const unsigned char* data, int scrW, int scrH
 	// How many pixels will be scanned from the top
 	const int maxH = scrH / 4;
 
-	const int distanceBetweenRays = scrW / 128;
+	const int distanceBetweenRays = scrW * 0.1;
 
 	const int bytesInRow = scrW * bytesPerPixel;
 
@@ -280,15 +280,18 @@ void GrabberBase::grab()
 
 			const int bytesPerPixel = 4;
 
-			const int scrWidth = grabbedScreen->screenInfo.rect.width();
-			const int scrHeight = grabbedScreen->screenInfo.rect.height();
 			const auto data = grabbedScreen->imgData;
+			const auto dataSize = grabbedScreen->imgDataSize;
+			const auto bytesPerRow = grabbedScreen->bytesPerRow > 0 ? grabbedScreen->bytesPerRow : grabbedScreen->screenInfo.rect.width() * bytesPerPixel;
+
+			const int scaledScrWidth  = bytesPerRow / bytesPerPixel;
+			const int scaledScrHeight = (dataSize / bytesPerPixel) / scaledScrWidth;
 
 			// Let's find a border height
 			if (blackBorder == -1)
 			{
-				blackBorder = GetTopBlackBorder(data, scrWidth, scrHeight, bytesPerPixel);
-				scaleByBlackBorder = (scrHeight - blackBorder) / static_cast<float>(scrHeight);
+				blackBorder = GetTopBlackBorder(data, scaledScrWidth, scaledScrHeight, bytesPerPixel);
+				scaleByBlackBorder = (scaledScrHeight - blackBorder) / static_cast<float>(scaledScrHeight);
 			}
 
 			// If black border detected move and scale widgets
@@ -312,7 +315,7 @@ void GrabberBase::grab()
 			Q_ASSERT(grabbedScreen->imgData);
 			QRgb avgColor = Grab::Calculations::calculateAvgColor(
 				data, grabbedScreen->imgFormat,
-				grabbedScreen->bytesPerRow > 0 ? grabbedScreen->bytesPerRow : scrWidth * bytesPerPixel,
+				bytesPerRow,
 				preparedRect);
 			_context->grabResult->append(avgColor);
 		}
