@@ -155,22 +155,17 @@ int GrabberBase::GetTopBlackBorder(const unsigned char* data, int scrW, int scrH
 
 	const int bytesInRow = scrW * bytesPerPixel;
 
-	int border = 0;
+	int border = scrH;
 
 	for (int p = 0; p < scrW; p += distanceBetweenRays)
 	{
 		const int r = VRay(data, p, scrW, scrH, bytesPerPixel, bytesInRow, maxH);
-		if (p == 0)
+		if (r == 0)
 		{
-			border = r;
-			continue;
+			return 0;
 		}
 
-		if (border != r)
-		{
-			border = 0;
-			break;
-		}
+		border = qMin(border, r);
 	}
 
 	return border;
